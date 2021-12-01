@@ -13,10 +13,12 @@ use Valitron\Validator;
 
 use Xyng\Yuoshi\Authority\LearningObjectiveAuthority;
 use Xyng\Yuoshi\Authority\PackageAuthority;
+use Xyng\Yuoshi\Authority\StationAuthority;
 use Xyng\Yuoshi\Helper\PermissionHelper;
 use Xyng\Yuoshi\Model\Files;
 use Xyng\Yuoshi\Model\LearningObjectives;
 use Xyng\Yuoshi\Model\Stations;
+use Xyng\Yuoshi\Model\Tasks;
 
 class LearningObjectivesController extends JsonApiController
 {
@@ -98,22 +100,8 @@ class LearningObjectivesController extends JsonApiController
         if (!$learning_objective->store()) {
             throw new InternalServerError("could not persist entity");
         }
-
-        $station = Stations::build(
-            [
-                'package_id' => $package_id,
-                'title' => $learning_objective->title,
-                'slug' => strtolower($learning_objective->title),
-                'learning_objective_id' => $learning_objective->id,
-            ]
-        );
-        $station->sort = Stations::nextSort($package->id);
-        $station->package_id = $package->id;
-
-        if (!$station->store()) {
-            throw new InternalServerError("could not save belonging station");
-        }
-        // create beloning station for objective
+        $this->createTextsForLearningObjective($learning_objective, $this->getUser($request));
+        $this->createQuestionForObjective($learning_objective, $this->getUser($request));
 
         return $this->getContentResponse($learning_objective);
     }
@@ -190,5 +178,55 @@ class LearningObjectivesController extends JsonApiController
         }
 
         return $validator;
+    }
+
+    protected function createTextsForLearningObjective($learning_objective, $user)
+    {
+        $objectiveStations = StationAuthority::findFiltered([$learning_objective->package_id], $user, PermissionHelper::getMasters('dozent'));
+        $targetStationKey = array_search('pupiltexts', array_column($objectiveStations, 'slug'));
+        $targetStation = $objectiveStations[$targetStationKey];
+        $task_count = Tasks::countWithQuery(['conditions' => [
+            'station_id' => $targetStation->id
+        ]]);
+
+        $task = Tasks::build(
+            [
+                'title' => $learning_objective->title,
+                'kind' => 'tag',
+                'description' => 'Beschreibung wählen',
+                'credits' => 0,
+                'sort' => $task_count,
+                'is_training' => false,
+                'station_id' => $targetStation->id,
+            ]
+        );
+        if (!$task->store()) {
+            throw new InternalServerError("could not persist entity");
+        }
+    }
+
+    protected function createQuestionForObjective($learning_objective, $user)
+    {
+        $objectiveStations = StationAuthority::findFiltered([$learning_objective->package_id], $user, PermissionHelper::getMasters('dozent'));
+        $targetStationKey = array_search('quest', array_column($objectiveStations, 'slug'));
+        $targetStation = $objectiveStations[$targetStationKey];
+        $task_count = Tasks::countWithQuery(['conditions' => [
+            'station_id' => $targetStation->id
+        ]]);
+
+        $task = Tasks::build(
+            [
+                'title' => $learning_objective->title,
+                'kind' => 'multi',
+                'description' => 'Beschreibung wählen',
+                'credits' => 0,
+                'sort' => $task_count,
+                'is_training' => false,
+                'station_id' => $targetStation->id,
+            ]
+        );
+        if (!$task->store()) {
+            throw new InternalServerError("could not persist entity");
+        }
     }
 }
