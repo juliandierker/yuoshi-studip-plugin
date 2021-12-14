@@ -18,6 +18,7 @@ use Xyng\Yuoshi\Helper\AuthorityHelper;
 use Xyng\Yuoshi\Helper\PermissionHelper;
 use Xyng\Yuoshi\Helper\QueryField;
 use Xyng\Yuoshi\Model\Packages;
+use Xyng\Yuoshi\Model\Stations;
 
 class PackagesController extends JsonApiController
 {
@@ -100,6 +101,7 @@ class PackagesController extends JsonApiController
             throw new InternalServerError("could not save package");
         }
 
+        $this->createInitialStations($package);
         return $this->getContentResponse($package);
     }
 
@@ -174,5 +176,40 @@ class PackagesController extends JsonApiController
         }
 
         return $validator;
+    }
+
+    protected function createInitialStations($package)
+    {
+        // create initial stations for texts
+
+        $stationOverview = Stations::build(
+            [
+                'package_id' => $package->id,
+                'title' => 'Deine Schüler:innen im Überblick',
+                'slug' => strtolower('pupiltexts'),
+            ]
+        );
+        $stationOverview->sort = Stations::nextSort($package->id);
+        $stationOverview->package->id = $package->id;
+
+        if (!$stationOverview->store()) {
+            throw new InternalServerError("could not save belonging station");
+        }
+
+        // create initial stations for Quest
+
+        $stationQuest = Stations::build(
+            [
+                'package_id' => $package->id,
+                'title' => 'Quest',
+                'slug' => strtolower('quest'),
+            ]
+        );
+        $stationQuest->sort = Stations::nextSort($package->id);
+        $stationQuest->package->id = $package->id;
+
+        if (!$stationQuest->store()) {
+            throw new InternalServerError("could not save belonging station");
+        }
     }
 }
