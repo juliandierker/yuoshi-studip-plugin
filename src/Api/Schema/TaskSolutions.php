@@ -23,6 +23,7 @@ class TaskSolutions extends SchemaProvider {
     {
         /** @var \Xyng\Yuoshi\Model\UserTaskSolutions $resource */
         return [
+            'task_id' => $resource->task_id,
             'points' => (int) $resource->points,
             'is_correct' => (bool) $resource->is_correct,
             'finished' => $resource->finished ? $resource->finished->format('c') : null,
